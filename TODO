@@ -1,6 +1,13 @@
-- Implement HMC
-- find example to test/showcase 
+- Implement HMC and test it
+- find example distribution, benchmark
 - compare to MCMC emcee 
-- presentation
+- convergence tests, 
+- presentation:
+  1. Hamiltonian MCMC 101
+  2. basic distribution
+  3. counterexample
+  4. benchmark
+  5. impact of parameters
+  6. NUTS
 - report
 
