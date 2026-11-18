@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal
 
 #first implement for 1D
-### Gelman-Rubin: choose R<1.1
+### Gelman-Rubin: aim for Rhat<1.1 or (for rank-normalized split Rhat) Rhat<1.01
 
 #calculate variance of each chain
 def var_per_chain(chains):

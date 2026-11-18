@@ -2,6 +2,11 @@
 - find example distribution, benchmark
 - compare to MCMC emcee 
 - convergence tests, 
+  1. Gelman-Rubin:
+    a. split Rhat
+    b. rank-normalized
+  2. Effective Sample Size
+  3. NUTS divergence diagnostic
 - presentation:
   1. Hamiltonian MCMC 101
   2. basic distribution
