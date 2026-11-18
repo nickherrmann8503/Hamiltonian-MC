@@ -6,24 +6,12 @@ from scipy.stats import multivariate_normal
 
 #first implement for 1D
 ### Gelman-Rubin: choose R<1.1
-#Steps:
-
-#1. Run M>1 Chains of length 2N
-
-
-# 2.Discard the first N draws of each chain, leaving N iterations in the chain
-def discard_burnin(N,M,chains):
-    for i in range(M):
-        chain = chains[i]
-        chains[i]=chain[-N:]
-
-    return chains
 
 #calculate variance of each chain
 def var_per_chain(M,chains):
     s=np.zeros(M)
     for i in range(M):
-        s[i]=np.var(chains[i])
+        s[i]=np.std(chains[i])
 
     return s
 
@@ -31,7 +19,7 @@ def var_per_chain(M,chains):
 def mean_per_chain(M,chains):
     theta_bar = np.zeros(M)
     for i in range(M):
-        theta_bar[i]=np.var(chains[i])
+        theta_bar[i]=np.mean(chains[i])
     
     return theta_bar
 
@@ -43,11 +31,11 @@ def mean_all_chains(theta_bar):
 
 #within chain variance:
 def within_var(M,s):
-    return 1/M * np.sum(s[i]**2 for i in range(0,M))
+    return 1/M * np.sum(s**2)
 
 #between chain variance:
 def between_var(N,M,theta_bar,mu):
-    return N/(M-1)* np.sum((theta_bar[i]-mu)**2 for i in range(0,M))
+    return N/(M-1)* np.sum((theta_bar-mu)**2)
 
 #4. Calculate the estimated variance of \theta as the weighted sum of between and within chain variance.
 def variance(N,W,B):
@@ -59,9 +47,11 @@ def scale_red_factor(var,W):
 
 def Gelman_Rubin(chains):
 
-    M, N = chains.shape
+    M, L = chains.shape
+    N = L // 2
 
-    chains = discard_burnin(N,M,chains)
+    #discard burn in
+    chains = chains[:, -N:]
 
     s=var_per_chain(M,chains)
     theta_bar=mean_per_chain(M,chains)
