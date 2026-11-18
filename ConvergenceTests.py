@@ -1,5 +1,5 @@
 import numpy as np
-from HamiltonianSampler import chain, target_distribution
+from HamiltonianSampler import dchain, chain
 from random import randint,random
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal
@@ -8,34 +8,26 @@ from scipy.stats import multivariate_normal
 ### Gelman-Rubin: choose R<1.1
 
 #calculate variance of each chain
-def var_per_chain(M,chains):
-    s=np.zeros(M)
-    for i in range(M):
-        s[i]=np.std(chains[i])
-
-    return s
+def var_per_chain(chains):
+    return np.std(chains, axis=1, ddof=1)
 
 #mean of parameter per chain
-def mean_per_chain(M,chains):
-    theta_bar = np.zeros(M)
-    for i in range(M):
-        theta_bar[i]=np.mean(chains[i])
-    
-    return theta_bar
+def mean_per_chain(chains):    
+    return np.mean(chains, axis=1)
 
 #calculate mean of each parameter across all chains
 def mean_all_chains(theta_bar):
-    return np.mean(theta_bar)
+    return np.mean(theta_bar, axis=0)
 
 #3. Calculate the within and between chain variance.
 
 #within chain variance:
 def within_var(M,s):
-    return 1/M * np.sum(s**2)
+    return 1/M * np.sum(s**2, axis=0)
 
 #between chain variance:
 def between_var(N,M,theta_bar,mu):
-    return N/(M-1)* np.sum((theta_bar-mu)**2)
+    return N/(M-1)* np.sum((theta_bar-mu)**2, axis=0)
 
 #4. Calculate the estimated variance of \theta as the weighted sum of between and within chain variance.
 def variance(N,W,B):
@@ -47,14 +39,18 @@ def scale_red_factor(var,W):
 
 def Gelman_Rubin(chains):
 
-    M, L = chains.shape
+    #account for 1D case
+    if chains.ndim == 2:
+        chains = chains[:, :, None]
+
+    M, L, D = chains.shape
     N = L // 2
 
     #discard burn in
     chains = chains[:, -N:]
 
-    s=var_per_chain(M,chains)
-    theta_bar=mean_per_chain(M,chains)
+    s=var_per_chain(chains)
+    theta_bar=mean_per_chain(chains)
     mu=mean_all_chains(theta_bar)
 
     W = within_var(M,s)
@@ -64,10 +60,25 @@ def Gelman_Rubin(chains):
 
     return R_hat
 
-L = 10000 #leapfrog steps
+L = 100 #leapfrog steps
 dt = 0.5 #step size
 
-chains = []
+d = 2
+
+M = np.array([[10000.0,0],
+              [0,10000.0]])
+print(np.linalg.inv(M))
+
+p_start = np.random.normal(0,1)
+p_start = np.random.default_rng().multivariate_normal([0,0], M, size=1)
+print(p_start)
+
+Xns = np.array([dchain(np.array([random()*100,random()*100]),100,dt,L,M) for i in range(20)])
+
+#print('chains shape: ', Xns.shape)
+
+#1D
+"""chains = []
 for i in range(100):
     x_start = random()*100
     Xn = chain(x_start,30,dt,L,1)
@@ -77,9 +88,10 @@ plt.show()
 chains = np.array(chains)
 mean = np.sum(chains[:,-1])/100
 std = np.std(chains[:,-1])
-print(chains[:,-1])
-print(mean,std)
+#print(chains[:,-1])
+#print(mean,std)
+"""
 
-R_hat=Gelman_Rubin(chains)
+R_hat=Gelman_Rubin(Xns)
 
 print('Gelman-Rubin: ', R_hat)
