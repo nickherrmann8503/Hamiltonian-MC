@@ -60,6 +60,38 @@ def Gelman_Rubin(chains):
 
     return R_hat
 
+
+#multivariate Effective sample size (mESS)
+
+#sample covariance matrix
+def cov(chains):
+    flat = chains.reshape(-1, chains.shape[-1])
+    return np.cov(flat, rowvar=False)
+
+#batch estimation
+
+#estimate of the monte carlo covariance matrix for the Markov Chain
+def MCcov(chains):
+    return chains
+
+def mESS(chains):
+    #account for 1D case
+    if chains.ndim == 2:
+        chains = chains[:, :, None]
+    
+    M, L, D = chains.shape
+    N = L // 2
+    
+    #discard burn in
+    chains = chains[:, -N:]
+
+    lam=cov(chains)
+    sig=MCcov(chains)
+
+    mESS=N*lam**(1/D)/sig**(1/D)
+
+    return mESS
+
 L = 100 #leapfrog steps
 dt = 0.5 #step size
 
@@ -92,6 +124,6 @@ std = np.std(chains[:,-1])
 #print(mean,std)
 """
 
-R_hat=Gelman_Rubin(Xns)
+#R_hat=Gelman_Rubin(Xns)
 
-print('Gelman-Rubin: ', R_hat)
+#print('Gelman-Rubin: ', R_hat)
