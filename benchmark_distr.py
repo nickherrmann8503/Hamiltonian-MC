@@ -40,6 +40,8 @@ def grad_log_neal_funnel(theta, sigma_v=3.0, sigma_x=1.0):
     return np.concatenate([[dv], dx])
 
 
+
+""" FUNNEL TEST
 linspace = np.linspace(-10,10)
 y = np.empty(linspace.size)
 for j in range(5):
@@ -51,6 +53,8 @@ for j in range(5):
 
 plt.show()
 """
+
+""" FUNNEL SAMPLING
 print(v.size,x.size)
 for i in range(9):
     plt.scatter(x[:,i],v)
@@ -59,6 +63,8 @@ plt.show()
 """
 
 # Multiple Gaussian Overlap (n-dimesional)
+
+
 
 
 # maybe a banana?

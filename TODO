@@ -1,5 +1,8 @@
 - Implement HMC and test it
 - find example distribution, benchmark
+  1. Gaussian (high d, covariance adjust)
+  2. Neal's Funnel (exploration with sharp peak environment)
+  3. ?Overlapping Gaussians (when will HMC get stuck)
 - compare to MCMC emcee 
 - convergence tests, 
   1. Gelman-Rubin:
