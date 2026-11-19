@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 from numpy.random import multivariate_normal
 import matplotlib.pyplot as plt
 
@@ -18,18 +19,19 @@ def grad_log_gaussian(x,mu,M):
 
 # Neal's Funnel
 
-def log_neal_funnel(q, sigma_v=3.0, sigma_x=1.0):
-    v, x = q[0], q[1:]
-    n = x.size
-    return (-v**2 / (2 * sigma_v**2) - 0.5 * n * v - 0.5 * np.sum(x**2) * np.exp(-v) / sigma_x**2)
-
 def sample_funnel(n_samples, dim=9, sigma_v=3.0, sigma_x=1.0, rng=None):
     rng = np.random.default_rng(rng)
     v = rng.normal(0, sigma_v, size=n_samples)
     x = sigma_x * rng.normal(size=(n_samples, dim)) * np.exp(v / 2)[:, None]
     return v, x
 
-def grad_log_prob(theta, sigma_v=3.0, sigma_x=1.0):
+def log_neal_funnel(theta, sigma_v=3.0, sigma_x=1.0):
+    v, x = theta[0], theta[1:]
+    n = x.size
+    return (-v**2 / (2 * sigma_v**2) - 0.5 * n * v - 0.5 * np.sum(x**2) * np.exp(-v) / sigma_x**2)
+
+
+def grad_log_neal_funnel(theta, sigma_v=3.0, sigma_x=1.0):
     v, x = theta[0], theta[1:]
     n = x.size
     ev = np.exp(-v) / sigma_x**2
@@ -37,10 +39,22 @@ def grad_log_prob(theta, sigma_v=3.0, sigma_x=1.0):
     dx = -x * ev
     return np.concatenate([[dv], dx])
 
-"""v,x = sample_funnel(1000)
+
+linspace = np.linspace(-10,10)
+y = np.empty(linspace.size)
+for j in range(5):
+    for i,val in enumerate(linspace):
+        q = np.array([j,val])
+        y[i] = log_neal_funnel(q)
+    plt.plot(linspace,np.exp(y))
 
 
-plt.scatter(x[:,0],v)
+plt.show()
+"""
+print(v.size,x.size)
+for i in range(9):
+    plt.scatter(x[:,i],v)
+
 plt.show()
 """
 
