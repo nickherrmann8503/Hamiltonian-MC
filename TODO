@@ -3,13 +3,14 @@
   1. Gaussian (high d, covariance adjust)
   2. Neal's Funnel (exploration with sharp peak environment)
   3. ?Overlapping Gaussians (when will HMC get stuck)
-- compare to MCMC emcee 
 - convergence tests, 
   1. Gelman-Rubin:
     a. split Rhat
     b. rank-normalized
   2. Effective Sample Size
   3. NUTS divergence diagnostic
+- posterior predictive checks
+- compare to MCMC emcee (2D)
 - presentation:
   1. Hamiltonian MCMC 101
   2. basic distribution
