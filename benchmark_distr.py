@@ -41,7 +41,7 @@ def grad_log_neal_funnel(theta, sigma_v=3.0, sigma_x=1.0):
 
 
 
-""" FUNNEL TEST
+#FUNNEL TEST
 linspace = np.linspace(-10,10)
 y = np.empty(linspace.size)
 for j in range(5):
@@ -52,7 +52,7 @@ for j in range(5):
 
 
 plt.show()
-"""
+
 
 """ FUNNEL SAMPLING
 print(v.size,x.size)
@@ -88,4 +88,4 @@ fig.colorbar(pcm, ax=ax, label=r'$p(x_1, x_2)$')
 plt.show()
 
 # maybe a banana?
-
+# -> research a bit more
