@@ -88,4 +88,4 @@ fig.colorbar(pcm, ax=ax, label=r'$p(x_1, x_2)$')
 plt.show()
 
 # maybe a banana?
-
+# -> research a bit more
