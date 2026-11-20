@@ -8,7 +8,7 @@
     a. split Rhat
     b. rank-normalized
   2. Effective Sample Size
-  4. Efficiency -> show, when 'converged'
+  4. Efficiency -> show when 'converged'
   3. NUTS divergence diagnostic
 - posterior predictive checks
 - compare to MCMC emcee (2D)
