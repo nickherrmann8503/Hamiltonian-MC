@@ -64,8 +64,28 @@ plt.show()
 
 # Multiple Gaussian Overlap (n-dimesional)
 
+def log_gaussian_mixture(e,a,x,M):
+    return np.log(0.5) + np.log(gaussian(x,a * e,M) + gaussian(x,-a * e,M))
+
+e = np.array([1,0])
+a = 4
+x1 = np.linspace(-10, 10, 400)
+x2 = np.linspace(-10, 10, 400)
+X1, X2 = np.meshgrid(x1, x2)
+pos = np.dstack((X1,X2))
+M = np.array([[2,0],[0,2]])
+Z = np.zeros(X1.shape)
 
 
+for i in range(pos.shape[0]):
+    for j in range(pos.shape[1]):
+        Z[i,j] = np.exp(log_gaussian_mixture(e,a,pos[i,j],M))
+
+fig, ax = plt.subplots(figsize=(6, 5))
+pcm = ax.pcolormesh(X1, X2, Z, cmap='viridis', shading='auto')
+fig.colorbar(pcm, ax=ax, label=r'$p(x_1, x_2)$')
+
+plt.show()
 
 # maybe a banana?
 
