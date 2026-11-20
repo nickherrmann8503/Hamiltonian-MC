@@ -1,4 +1,5 @@
 import numpy as np
+from numpy import linalg
 from HamiltonianSampler import dchain, chain
 from random import randint,random
 import matplotlib.pyplot as plt
@@ -63,16 +64,35 @@ def Gelman_Rubin(chains):
 
 #multivariate Effective sample size (mESS)
 
+#Σ is the asymptotic covariance matrix in the Markov chain CLT 
+#(different from Λ since samples are correlated.
+
+#different source: SIGMA is an estimate of the Monte 
+#Carlo covariance matrix for the Markov chain (here obtained by batch estimation).
+
 #sample covariance matrix
 def cov(chains):
     flat = chains.reshape(-1, chains.shape[-1])
     return np.cov(flat, rowvar=False)
 
+#identity if looking for mean, change this if looking for probability,etc.
+def g(x):
+    return x
+
 #batch estimation
+#rule of thumb: batch size of sqrt(N)
+def batch_est(chains,N):
+
+    #batch size
+    a=np.sqrt(N)
+
+    batches = 1/a * g()
+
+    return batches, a
 
 #estimate of the monte carlo covariance matrix for the Markov Chain
-def MCcov(chains):
-    return chains
+def MCcov(batches, a):
+    return batches
 
 def mESS(chains):
     #account for 1D case
@@ -85,10 +105,12 @@ def mESS(chains):
     #discard burn in
     chains = chains[:, -N:]
 
-    lam=cov(chains)
-    sig=MCcov(chains)
+    batches, a = batch_est(chains,N)
 
-    mESS=N*lam**(1/D)/sig**(1/D)
+    lam=cov(chains)
+    sig=MCcov(batches, a)
+
+    mESS=N*np.linalg.det(lam)**(1/D)/np.linalg.det(sig)**(1/D)
 
     return mESS
 
