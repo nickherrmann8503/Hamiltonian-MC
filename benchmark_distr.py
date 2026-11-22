@@ -77,6 +77,7 @@ M = np.array([[2,0],[0,2]])
 Z = np.zeros(X1.shape)
 
 
+"""
 for i in range(pos.shape[0]):
     for j in range(pos.shape[1]):
         Z[i,j] = np.exp(log_gaussian_mixture(e,a,pos[i,j],M))
@@ -86,6 +87,7 @@ pcm = ax.pcolormesh(X1, X2, Z, cmap='viridis', shading='auto')
 fig.colorbar(pcm, ax=ax, label=r'$p(x_1, x_2)$')
 
 plt.show()
+"""
 
 # maybe a banana?
 # -> research a bit more
