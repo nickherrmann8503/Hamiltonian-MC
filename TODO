@@ -12,6 +12,8 @@
   3. NUTS divergence diagnostic
 - posterior predictive checks
 - compare to MCMC emcee (2D)
+  1. computational budget!
+  2. Multi-dimensional: mean absolute error
 - presentation:
   1. Hamiltonian MCMC 101
   2. basic distribution

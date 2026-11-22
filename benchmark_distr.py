@@ -9,6 +9,8 @@ def gaussian(x,mu,M):
     d = x.size
     return np.exp(-0.5*(x-mu).T @ np.linalg.inv(M) @ (x-mu))/np.sqrt((2*np.pi)**d * np.linalg.det(M))
 
+def log_gaussian_1d(x,mu,M):
+    return
 
 def log_gaussian(x,mu,M):
     d = x.size
@@ -41,7 +43,7 @@ def grad_log_neal_funnel(theta, sigma_v=3.0, sigma_x=1.0):
 
 
 
-#FUNNEL TEST
+"""#FUNNEL TEST
 linspace = np.linspace(-10,10)
 y = np.empty(linspace.size)
 for j in range(5):
@@ -51,7 +53,7 @@ for j in range(5):
     plt.plot(linspace,np.exp(y))
 
 
-plt.show()
+plt.show()"""
 
 
 """ FUNNEL SAMPLING
@@ -67,14 +69,14 @@ plt.show()
 def log_gaussian_mixture(e,a,x,M):
     return np.log(0.5) + np.log(gaussian(x,a * e,M) + gaussian(x,-a * e,M))
 
-e = np.array([1,0])
+"""e = np.array([1,0])
 a = 4
 x1 = np.linspace(-10, 10, 400)
 x2 = np.linspace(-10, 10, 400)
 X1, X2 = np.meshgrid(x1, x2)
 pos = np.dstack((X1,X2))
 M = np.array([[2,0],[0,2]])
-Z = np.zeros(X1.shape)
+Z = np.zeros(X1.shape)"""
 
 
 """
