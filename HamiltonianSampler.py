@@ -45,6 +45,17 @@ def potential_gradient(x):
     return (x-mean)/sigma**2
 
 def potential_gradient_d(x):
+    h=1e-5
+    x = np.atleast_2d(x).astype(float)   # (n_chains, d)
+    n_chains, d = x.shape
+    grad = np.empty((n_chains, d))
+    for i in range(d):
+        e = np.zeros(d)
+        e[i] = h
+        grad[:, i] = (potential_energy_d(x + e) - potential_energy_d(x - e)) / (2 * h)
+    return grad
+    
+    
     return (x-means) @ np.linalg.inv(Sigma)
 
 def Hamiltonian(x,p,mass_matrix):
