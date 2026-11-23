@@ -149,3 +149,32 @@ std = np.std(chains[:,-1])
 #R_hat=Gelman_Rubin(Xns)
 
 #print('Gelman-Rubin: ', R_hat)
+
+
+
+def NUTS_divergence_diagnostic(H, T, d_t):
+    """
+    parameters:
+    H: Hamiltonian energy per chain
+    d_t: divergence flag per chain
+    
+    returns:
+    diagnostic: low values (approx. <0.3) indicate inefficient exploration of energy distribution
+    divergence_rate: fraction of divergent NUTS iterations"""
+    diagnostic = 0
+    for t in range(1, len(H)):
+        diagnostic += (H[t] - H[t-1])**2 
+
+    diagnostic /= np.sum((H - mean_per_chain(H))**2)
+
+    divergence_rate = 1/T * np.sum(d_t) 
+
+    return diagnostic, divergence_rate
+
+def NUTS_divergence_diagnostic_verdict(H, T, d_t):
+    diagnostic, divergence_rate = NUTS_divergence_diagnostic(H, T, d_t)
+    if diagnostic < 0.3 and divergence_rate > 0.01:
+        print("VERDICT: chain is unreliable - reparameterize or raise adapt_delta.")
+    else:
+        print("VERDICT: chain is healthy.")
+
