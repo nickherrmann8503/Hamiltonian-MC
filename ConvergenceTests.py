@@ -165,7 +165,8 @@ std = np.std(chains[:,-1])
 #R_hat=Gelman_Rubin(Xns)
 
 #print('Gelman-Rubin: ', R_hat)
-
+mess=(mESS(Xns))
+print('multivariate effective sample size: ', mess)
 
 
 def NUTS_divergence_diagnostic(H, T, d_t):
@@ -173,6 +174,7 @@ def NUTS_divergence_diagnostic(H, T, d_t):
     parameters:
     H: Hamiltonian energy per chain
     d_t: divergence flag per chain
+    T: total number of NUTS iterations
     
     returns:
     diagnostic: low values (approx. <0.3) indicate inefficient exploration of energy distribution
@@ -194,5 +196,4 @@ def NUTS_divergence_diagnostic_verdict(H, T, d_t):
     else:
         print("VERDICT: chain is healthy.")
 
-mess=(mESS(Xns))
-print('multivariate effective sample size: ', mess)
+
