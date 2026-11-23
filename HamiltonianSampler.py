@@ -16,10 +16,15 @@ def gaussian(t,mu,sigma):
     return np.exp(-(t-mu)**2/(2*sigma**2))/(sigma*np.sqrt(2*np.pi))
 
 def gaussian_ND(x,mu,M):
-    d = len(x)
+    d = x.shape[1]
+    x= np.atleast_2d(x)
     #print("det", np.linalg.det(M),x-mu,x,mu)
     #print("inv", np.linalg.inv(M))
-    return np.exp(-0.5*(x-mu).T @ np.linalg.inv(M) @ (x-mu))/np.sqrt((2*np.pi)**d * np.linalg.det(M))
+    diff = x-mu
+    Minv = np.linalg.inv(M)
+    quad = np.einsum('ij,jk,ik->i', diff, Minv, diff)
+    norm = np.sqrt((2*np.pi)**d * np.linalg.det(M))
+    return np.exp(-0.5 * quad) / norm
 
 def target_distribution(t):
     return gaussian(t,mean,sigma)
@@ -40,14 +45,25 @@ def potential_gradient(x):
     return (x-mean)/sigma**2
 
 def potential_gradient_d(x):
+    h=1e-5
+    x = np.atleast_2d(x).astype(float)   # (n_chains, d)
+    n_chains, d = x.shape
+    grad = np.empty((n_chains, d))
+    for i in range(d):
+        e = np.zeros(d)
+        e[i] = h
+        grad[:, i] = (potential_energy_d(x + e) - potential_energy_d(x - e)) / (2 * h)
+    return grad
+    
+    
     return (x-means) @ np.linalg.inv(Sigma)
 
 def Hamiltonian(x,p,mass_matrix):
     return potential_energy(x) + 0.5*p**2 /mass_matrix
 
-def Hamiltonian_d(x,p,mass_matrix):
-    #print("potential is ",potential_energy_d(x))
-    return potential_energy_d(x) + 0.5*p.T @ np.linalg.inv(mass_matrix) @ p
+def Hamiltonian_d(x, p, mass_matrix):
+    Minv = np.linalg.inv(mass_matrix)
+    return potential_energy_d(x) + 0.5 * np.sum((p @ Minv) * p, axis=1)   # (20,)
 
 def leapfrog(x,p,dt,L,mass_matrix):
     ps = np.zeros((L+1))
@@ -72,12 +88,9 @@ def alpha(x_0,x_Ldt,p_0,p_Ldt,mass_matrix):
 
     return min(1,np.exp(-Hamiltonian(x_Ldt,p_Ldt,mass_matrix))/np.exp(-Hamiltonian(x_0,p_0,mass_matrix)))
 
-def alpha_d(x_0,x_Ldt,p_0,p_Ldt,mass_matrix):
-    #print(np.exp(-Hamiltonian(x_Ldt,p_Ldt,mass_matrix)))
-    #print(np.exp(-Hamiltonian_d(x_Ldt,p_Ldt,mass_matrix)))
-    #print(np.exp(-Hamiltonian_d(x_0,p_0,mass_matrix)))
-    #print(np.exp(-Hamiltonian_d(x_Ldt,p_Ldt,mass_matrix)) @ np.linalg.inv())
-    return min(1,np.exp(-Hamiltonian_d(x_Ldt,p_Ldt,mass_matrix)) / np.exp(-Hamiltonian_d(x_0,p_0,mass_matrix)))
+def alpha_d(x_0, x_Ldt, p_0, p_Ldt, mass_matrix):
+    dH = Hamiltonian_d(x_0, p_0, mass_matrix) - Hamiltonian_d(x_Ldt, p_Ldt, mass_matrix)
+    return np.minimum(1.0, np.exp(dH))           # (20,)
 
 
 def chain(x_0,N,dt,L,mass_matrix):
@@ -95,20 +108,20 @@ def chain(x_0,N,dt,L,mass_matrix):
 
     return X
 
+rng = np.random.default_rng()
 
 def dchain(x_0,N,dt,L,mass_matrix):
-
-    X = np.zeros((N,len(x_0)))
+    #needs x_0 in shape (N_chains,d)
+    X = np.zeros((N,len(x_0),len(x_0[0])))
     X[0] = x_0
+    print(x_0.shape)
     for n in range(N-1):
-        p_0 = np.squeeze(np.random.default_rng().multivariate_normal([0,0], mass_matrix, size=1))
+        p_0 = np.squeeze(np.random.default_rng().multivariate_normal([0,0], mass_matrix, size=len(x_0)))
         #print("p:",p_0)
         x_Ldt,p_Ldt = leapfrog_d(X[n],p_0,dt,L,mass_matrix)
-        al = alpha_d(X[n],x_Ldt,p_0,p_Ldt,mass_matrix)
-        if random() < al:
-            X[n+1] = x_Ldt
-        else:
-            X[n+1] = X[n]
+        al = alpha_d(X[n], x_Ldt, p_0, p_Ldt, mass_matrix)
+        accept = rng.random(len(al)) < al                # (20,) booleans
+        X[n+1] = np.where(accept[:, None], x_Ldt, X[n])
         #print("Xn:",X[n],n)
 
     return X
@@ -125,9 +138,10 @@ p_start = np.random.normal(0,1)
 p_start = np.random.default_rng().multivariate_normal([0,0], M, size=1)
 print(p_start)
 
-
-Xns = np.array([dchain(np.array([random()*100,random()*100]),100,dt,L,M) for i in range(20)])
-plt.plot(Xns[0,:,0],Xns[0,:,1],color="red")
+#now computes alll chains at once
+X0s = [[random()*100,random()*100] for i in range(20)]
+Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
+plt.plot(Xns[:,0,0],Xns[:,0,1],color="red")
 
 
 #Grid

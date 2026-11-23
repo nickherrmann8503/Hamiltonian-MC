@@ -73,7 +73,7 @@ def Gelman_Rubin(chains):
 #sample covariance matrix
 def cov(chains):
     flat = chains.reshape(-1, chains.shape[-1])
-    return np.cov(flat, rowvar=False)
+    return np.atleast_2d(np.cov(flat, rowvar=False))                  #rowvar=False st. columns are variables, rows are observations
 
 #identity if looking for mean, change this if looking for probability,etc.
 def g(x):
@@ -81,21 +81,25 @@ def g(x):
 
 #batch estimation
 #rule of thumb: batch size of sqrt(N)
-def batch_est(chains,N):
+#let T={.1, .2, .3, .4, .5}, and take mESS^*=\min _{t \in T, b_n=n^t} mESS(b_n)
+def batch_size(N, t):
+    b = max(1, int(N**t))
+    return b, N//b
 
-    #batch size
-    a=np.sqrt(N)
-
-    batches = 1/a * g()
-
-    return batches, a
+#\bar{Y}_k:=b_n^{-1} \sum_{t=1}^{b_n} Y_{k b_n+t} .
+def batch_mean(chains, b, a, M, D):
+    return chains[:, :a*b].reshape(M, a, b, D).mean(axis=2)
 
 #estimate of the monte carlo covariance matrix for the Markov Chain
-def MCcov(batches, a):
-    return batches
+#\Sigma_n=\frac{b_n}{a_n-1} \sum_{k=0}^{a_n-1}\left(\bar{Y}_k-\theta_n\right)\left(\bar{Y}_k-\theta_n\right)^T .
+def MCcov(chains, b, a,M,D):
+    Ybar=batch_mean(chains,b,a,M,D).reshape(M*a, D)
+    mu = chains[:, :a*b].reshape(-1, D).mean(axis=0)
+    R=Ybar-mu
+    return b/(M*a-1) * R.T@R
 
-def mESS(chains):
-    #account for 1D case
+def mESS(chains):                             #here I pooled batches over different chains-> if different chains have different means, this will lower mESS
+    #account for 1D case                      #maybe it would be better to find mESS for each chain separately and take mean of all chains    
     if chains.ndim == 2:
         chains = chains[:, :, None]
     
@@ -105,14 +109,26 @@ def mESS(chains):
     #discard burn in
     chains = chains[:, -N:]
 
-    batches, a = batch_est(chains,N)
-
     lam=cov(chains)
-    sig=MCcov(batches, a)
 
-    mESS=N*np.linalg.det(lam)**(1/D)/np.linalg.det(sig)**(1/D)
+    #use slogdet to avoid over-/underflow
+    _, logdet_lam = np.linalg.slogdet(lam)
 
-    return mESS
+    mess = []
+    for t in [0.1, 0.2, 0.3, 0.4, 0.5]:
+        b, a = batch_size(N,t)
+
+        if M*a <= D:          
+            continue
+
+        sig=MCcov(chains, b, a, M, D)
+        _, logdet_sig = np.linalg.slogdet(sig)
+
+        mess.append(a*b*M*np.exp((logdet_lam-logdet_sig)/D))
+
+    mess=np.array(mess)
+
+    return np.min(mess)
 
 L = 100 #leapfrog steps
 dt = 0.5 #step size
@@ -178,3 +194,5 @@ def NUTS_divergence_diagnostic_verdict(H, T, d_t):
     else:
         print("VERDICT: chain is healthy.")
 
+mess=(mESS(Xns))
+print('multivariate effective sample size: ', mess)
