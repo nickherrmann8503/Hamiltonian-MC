@@ -3,10 +3,15 @@ from random import randint,random
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal
+
+from benchmark_distr import sample_funnel, log_neal_funnel
+
 mean = 80
 sigma = 130
 means = [randint(20,100),randint(20,100)]
 means = [80,30]
+
+
 
 Sigma = np.array([[sigma,0],
          [0,sigma]])
@@ -26,10 +31,17 @@ def gaussian_ND(x,mu,M):
     norm = np.sqrt((2*np.pi)**d * np.linalg.det(M))
     return np.exp(-0.5 * quad) / norm
 
+
+#CHANGE THIS TO CHOOSE THE DISTRIBUTION TO SAMPLE
+#neal's funnel
+is_log = True
+
 def target_distribution(t):
     return gaussian(t,mean,sigma)
 
 def target_distribution_d(t):
+
+    return log_neal_funnel(t)
     return gaussian_ND(t,means,Sigma)
 
 def potential_energy(x):
@@ -39,13 +51,15 @@ def potential_energy(x):
 def potential_energy_d(x):
     #return -multivariate_normal(means,Sigma).logpdf(x)
     #print("distr is", target_distribution_d(x))
+    if is_log:
+        return -target_distribution_d(x)
     return -np.log(target_distribution_d(x))
 
 def potential_gradient(x):
     return (x-mean)/sigma**2
 
 def potential_gradient_d(x):
-    h=1e-5
+    h=1e-4
     x = np.atleast_2d(x).astype(float)   # (n_chains, d)
     n_chains, d = x.shape
     grad = np.empty((n_chains, d))
@@ -110,6 +124,7 @@ def chain(x_0,N,dt,L,mass_matrix):
 
 rng = np.random.default_rng()
 
+#hamiltonian
 def dchain(x_0,N,dt,L,mass_matrix):
     #needs x_0 in shape (N_chains,d)
     X = np.zeros((N,len(x_0),len(x_0[0])))
@@ -125,21 +140,23 @@ def dchain(x_0,N,dt,L,mass_matrix):
         #print("Xn:",X[n],n)
 
     return X
-       
-d = 2
 
-L = 10000 #leapfrog steps
+#EFFICIENT NO U TURN SAMPLER from paper
+
+
+d = 2
+#GAUSSIAN
+"""L = 1000 #leapfrog steps
 dt = 0.5 #step size
 M = np.array([[10000.0,0],
               [0,10000.0]])
-print(np.linalg.inv(M))
+print("the inverse mass matrix is:",np.linalg.inv(M))
 
 p_start = np.random.normal(0,1)
 p_start = np.random.default_rng().multivariate_normal([0,0], M, size=1)
-print(p_start)
 
 #now computes alll chains at once
-X0s = [[random()*100,random()*100] for i in range(20)]
+X0s = [[random()*100,random()*100] for i in range(10)]
 Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 plt.plot(Xns[:,0,0],Xns[:,0,1],color="red")
 
@@ -164,8 +181,30 @@ for Xn in Xns:
     plt.plot(Xn[:,0])
     plt.plot(Xn[:,1])
 plt.show()
+print(np.mean(Xn[:,0]),np.mean(Xn[:,1]))"""
 
+#NEALS FUNNEL
+L = 25
+dt = 0.2
+M = 10*np.eye(2)
 
+X0s = rng.normal(size=(10, 2))
+Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
+plt.plot(Xns[:,0,0],Xns[:,0,1],color="red")
+
+#plot neals funnel
+x = np.linspace(-20, 20, 300)
+v = np.linspace(-10, 10, 300)
+X, V = np.meshgrid(x, v)          
+pos = np.dstack((V, X))            
+
+logp = log_neal_funnel(pos)        
+
+cf = plt.contourf(V, X, np.maximum(logp, -12), levels=20, cmap="viridis")
+plt.colorbar(cf, label="log p(v, x)")
+plt.xlabel("x")
+plt.ylabel("v")
+plt.show()
 
 #1D
 """chains = []

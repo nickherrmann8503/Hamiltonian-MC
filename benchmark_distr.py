@@ -28,10 +28,11 @@ def sample_funnel(n_samples, dim=9, sigma_v=3.0, sigma_x=1.0, rng=None):
     return v, x
 
 def log_neal_funnel(theta, sigma_v=3.0, sigma_x=1.0):
-    v, x = theta[0], theta[1:]
-    n = x.size
-    return (-v**2 / (2 * sigma_v**2) - 0.5 * n * v - 0.5 * np.sum(x**2) * np.exp(-v) / sigma_x**2)
-
+    theta = np.asarray(theta, dtype=float)
+    v, x = theta[...,0], theta[...,1:]
+    n = x.shape[-1] #1 in 2d right?
+    return (-v**2 / (2 * sigma_v**2) - 0.5 * n * v - 0.5 * np.sum(x**2,axis=-1) * np.exp(-v) / sigma_x**2)
+    
 
 def grad_log_neal_funnel(theta, sigma_v=3.0, sigma_x=1.0):
     v, x = theta[0], theta[1:]
