@@ -38,7 +38,7 @@ def variance(N,W,B):
 def scale_red_factor(var,W):
     return np.sqrt(var/W)
 
-def Gelman_Rubin(chains):
+def Gelman_Rubin_single(chains):
 
     #account for 1D case
     if chains.ndim == 2:
@@ -60,6 +60,18 @@ def Gelman_Rubin(chains):
     R_hat = scale_red_factor(var,W)
 
     return R_hat
+
+def Gelman_Rubin(chains):
+    Rhat_all=[]
+    M, L, D = chains.shape
+
+    for i in range(2,L):
+        chain = chains[:, :i].copy()
+        Rhat_all.append(Gelman_Rubin_single(chain))
+
+    Rhat_all = np.array(Rhat_all)
+    
+    return Rhat_all
 
 
 #multivariate Effective sample size (mESS)
@@ -98,7 +110,7 @@ def MCcov(chains, b, a,M,D):
     R=Ybar-mu
     return b/(M*a-1) * R.T@R
 
-def mESS(chains):                             #here I pooled batches over different chains-> if different chains have different means, this will lower mESS
+def mESS_single(chains):                             #here I pooled batches over different chains-> if different chains have different means, this will lower mESS
     #account for 1D case                      #maybe it would be better to find mESS for each chain separately and take mean of all chains    
     if chains.ndim == 2:
         chains = chains[:, :, None]
@@ -130,20 +142,30 @@ def mESS(chains):                             #here I pooled batches over differ
 
     return np.min(mess)
 
-L = 100 #leapfrog steps
+def mESS(chains):
+    mess_all=[]
+    M, L, D = chains.shape
+
+    for i in range(2,L):
+        chain = chains[:, :i].copy()
+        mess_all.append(mESS_single(chain))
+
+    mess_all = np.array(mess_all)
+    
+    return mess_all
+
+L = 1000 #leapfrog steps
 dt = 0.5 #step size
-
-d = 2
-
 M = np.array([[10000.0,0],
               [0,10000.0]])
-print(np.linalg.inv(M))
+print("the inverse mass matrix is:",np.linalg.inv(M))
 
 p_start = np.random.normal(0,1)
 p_start = np.random.default_rng().multivariate_normal([0,0], M, size=1)
-print(p_start)
 
-Xns = np.array([dchain(np.array([random()*100,random()*100]),100,dt,L,M) for i in range(20)])
+#now computes alll chains at once
+X0s = [[random()*100,random()*100] for i in range(10)]
+Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 
 #print('chains shape: ', Xns.shape)
 
@@ -168,6 +190,27 @@ std = np.std(chains[:,-1])
 mess=(mESS(Xns))
 print('multivariate effective sample size: ', mess)
 
+#plot mESS/Efficiency
+def plot_mESS(mess, log=False):
+    x = np.arange(1, len(mess) + 1)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    ax.plot(x, mess, "o-", lw=2, ms=4, label="mESS")
+    ax.plot(x, x, "k--", lw=0.8, alpha=0.5, label="mESS = n")  # i.i.d. upper bound
+    if log:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+    ax.set_xlabel("chain length")
+    ax.set_ylabel("mESS")
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    return fig, ax
+
+# usage
+fig, ax = plot_mESS(mess)
+plt.show()
 
 def NUTS_divergence_diagnostic(H, T, d_t):
     """
