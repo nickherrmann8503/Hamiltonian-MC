@@ -3,13 +3,14 @@ from random import randint,random
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal
+from functools import partial
 
 from benchmark_distr import sample_funnel, log_neal_funnel
 
 mean = 80
 sigma = 130
 means = [randint(20,100),randint(20,100)]
-means = [80,30]
+means = [60,30]
 
 
 
@@ -36,29 +37,31 @@ def gaussian_ND(x,mu,M):
 #neal's funnel
 is_log = True
 
+
 def target_distribution(t):
     return gaussian(t,mean,sigma)
-
+"""
 def target_distribution_d(t):
+        print("SOS")
+        return 0
+        return log_neal_funnel(t)
 
-    return log_neal_funnel(t)
-    return gaussian_ND(t,means,Sigma)
+        return gaussian_ND(t,means,Sigma)"""
+
 
 def potential_energy(x):
 
     return -np.log(target_distribution(x))
 
-def potential_energy_d(x):
+def potential_energy_d(x,logp):
     #return -multivariate_normal(means,Sigma).logpdf(x)
     #print("distr is", target_distribution_d(x))
-    if is_log:
-        return -target_distribution_d(x)
-    return -np.log(target_distribution_d(x))
+    return -logp(x)
 
 def potential_gradient(x):
     return (x-mean)/sigma**2
 
-def potential_gradient_d(x):
+def potential_gradient_d(x,logp):
     h=1e-4
     x = np.atleast_2d(x).astype(float)   # (n_chains, d)
     n_chains, d = x.shape
@@ -66,7 +69,7 @@ def potential_gradient_d(x):
     for i in range(d):
         e = np.zeros(d)
         e[i] = h
-        grad[:, i] = (potential_energy_d(x + e) - potential_energy_d(x - e)) / (2 * h)
+        grad[:, i] = (potential_energy_d(x + e,logp) - potential_energy_d(x - e,logp)) / (2 * h)
     return grad
     
     
@@ -75,9 +78,9 @@ def potential_gradient_d(x):
 def Hamiltonian(x,p,mass_matrix):
     return potential_energy(x) + 0.5*p**2 /mass_matrix
 
-def Hamiltonian_d(x, p, mass_matrix):
+def Hamiltonian_d(x, p, mass_matrix,logp):
     Minv = np.linalg.inv(mass_matrix)
-    return potential_energy_d(x) + 0.5 * np.sum((p @ Minv) * p, axis=1)   # (20,)
+    return potential_energy_d(x,logp) + 0.5 * np.sum((p @ Minv) * p, axis=1)   # (20,)
 
 def leapfrog(x,p,dt,L,mass_matrix):
     ps = np.zeros((L+1))
@@ -89,21 +92,21 @@ def leapfrog(x,p,dt,L,mass_matrix):
         p = p_half - 0.5 * dt * potential_gradient(x)
     return x,p
 
-def leapfrog_d(x,p,dt,L,mass_matrix):
+def leapfrog_d(x,p,dt,L,mass_matrix,logp):
     #print("leapfrog x:",x)
     for i in range(L):
-        p_half = p-0.5 * dt * potential_gradient_d(x)#np.gradient(potential_energy(xs[i]))
+        p_half = p-0.5 * dt * potential_gradient_d(x,logp)#np.gradient(potential_energy(xs[i]))
         #print("addition",p_half @ np.linalg.inv(mass_matrix))
         x = x + dt * p_half @ np.linalg.inv(mass_matrix)  
-        p = p_half - 0.5 * dt * potential_gradient_d(x)
+        p = p_half - 0.5 * dt * potential_gradient_d(x,logp)
     return x,p
 
 def alpha(x_0,x_Ldt,p_0,p_Ldt,mass_matrix):
 
     return min(1,np.exp(-Hamiltonian(x_Ldt,p_Ldt,mass_matrix))/np.exp(-Hamiltonian(x_0,p_0,mass_matrix)))
 
-def alpha_d(x_0, x_Ldt, p_0, p_Ldt, mass_matrix):
-    dH = Hamiltonian_d(x_0, p_0, mass_matrix) - Hamiltonian_d(x_Ldt, p_Ldt, mass_matrix)
+def alpha_d(x_0, x_Ldt, p_0, p_Ldt, mass_matrix,logp):
+    dH = Hamiltonian_d(x_0, p_0, mass_matrix,logp) - Hamiltonian_d(x_Ldt, p_Ldt, mass_matrix,logp)
     return np.minimum(1.0, np.exp(dH))           # (20,)
 
 
@@ -125,7 +128,17 @@ def chain(x_0,N,dt,L,mass_matrix):
 rng = np.random.default_rng()
 
 #hamiltonian
-def dchain(x_0,N,dt,L,mass_matrix):
+def dchain(x_0,N,dt,L,mass_matrix,method = "gaussian"):
+    if method == "gaussian":
+        print("Gaussian sampling")
+        logp = lambda x: np.log(gaussian_ND(x,means,Sigma))
+    elif method == "neal":
+        print("Neal's funnel sampling")
+        logp = log_neal_funnel
+        is_log = True
+    else:
+        print("invalid method")
+        return "err"
     #needs x_0 in shape (N_chains,d)
     X = np.zeros((N,len(x_0),len(x_0[0])))
     X[0] = x_0
@@ -133,8 +146,8 @@ def dchain(x_0,N,dt,L,mass_matrix):
     for n in range(N-1):
         p_0 = np.squeeze(np.random.default_rng().multivariate_normal([0,0], mass_matrix, size=len(x_0)))
         #print("p:",p_0)
-        x_Ldt,p_Ldt = leapfrog_d(X[n],p_0,dt,L,mass_matrix)
-        al = alpha_d(X[n], x_Ldt, p_0, p_Ldt, mass_matrix)
+        x_Ldt,p_Ldt = leapfrog_d(X[n],p_0,dt,L,mass_matrix,logp)
+        al = alpha_d(X[n], x_Ldt, p_0, p_Ldt, mass_matrix,logp)
         accept = rng.random(len(al)) < al                # (20,) booleans
         X[n+1] = np.where(accept[:, None], x_Ldt, X[n])
         #print("Xn:",X[n],n)
@@ -182,7 +195,7 @@ for Xn in Xns:
     plt.plot(Xn[:,1])
 plt.show()
 print(np.mean(Xn[:,0]),np.mean(Xn[:,1]))"""
-
+"""
 #NEALS FUNNEL
 L = 25
 dt = 0.2
@@ -205,7 +218,7 @@ plt.colorbar(cf, label="log p(v, x)")
 plt.xlabel("x")
 plt.ylabel("v")
 plt.show()
-
+"""
 #1D
 """chains = []
 for i in range(100):
