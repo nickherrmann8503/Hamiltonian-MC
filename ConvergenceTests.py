@@ -96,13 +96,13 @@ def batch_size(n, t):
 
 #\bar{Y}_k:=b_n^{-1} \sum_{t=1}^{b_n} Y_{k b_n+t} .
 def batch_mean(chains, b, a, m, dim):
-    return chains[:a*b, :].reshape(a*b, m, dim).mean(axis=2)
+    return chains[:a*b, :].reshape(a, b, m, dim).mean(axis=1)
 
 #estimate of the monte carlo covariance matrix for the Markov Chain
 #\Sigma_n=\frac{b_n}{a_n-1} \sum_{k=0}^{a_n-1}\left(\bar{Y}_k-\theta_n\right)\left(\bar{Y}_k-\theta_n\right)^T .
 def MCcov(chains, b, a,m,dim):
     Ybar=batch_mean(chains,b,a,m,dim).reshape(m*a, dim)
-    mu = chains[:a*b, :].reshape(-1, dim).mean(axis=1)
+    mu = chains[:a*b, :].reshape(-1, dim).mean(axis=0)
     Rm=Ybar-mu
     return b/(m*a-1) * Rm.T@Rm
 
@@ -210,7 +210,7 @@ Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 #R_hat=Gelman_Rubin(Xns)
 
 #print('Gelman-Rubin: ', R_hat)
-mess=(mESS(Xns))
+#mess=(mESS(Xns))
 #print('multivariate effective sample size: ', mess)
 
 #plot mESS
@@ -250,18 +250,18 @@ def plot_eff(mess, l, m, log=False):
     fig.tight_layout()
     return fig, ax
 
-l, m, dim = Xns.shape
-fig, ax = plot_mESS(mess,l,m)
-fig, ax = plot_eff(mess,l,m)
-plt.show()
+#l, m, dim = Xns.shape
+#fig, ax = plot_mESS(mess,l,m)
+#fig, ax = plot_eff(mess,l,m)
+#plt.show()
 
 # issue: sawtooth structure in efficiency plot -> plot efficiency for different t's/batch sizes separately
 # result: probably some bias in logdet estimate of sigma, because estimates rise for larger t
-mess_t = mESS_t(Xns)
-for i,t in zip(range(5),[0.1,0.2,0.3,0.4,0.5]):
-    fig, ax = plot_eff(mess_t[:,i],l,m)
-    ax.set_title('$t={t}$')
-    plt.show()
+#mess_t = mESS_t(Xns)
+#for i,t in zip(range(5),[0.1,0.2,0.3,0.4,0.5]):
+#    fig, ax = plot_eff(mess_t[:,i],l,m)
+#    ax.set_title('$t={t}$')
+#    plt.show()
 
 def NUTS_divergence_diagnostic(H, T, d_t):
     """
@@ -291,3 +291,6 @@ def NUTS_divergence_diagnostic_verdict(H, T, d_t):
         print("VERDICT: chain is healthy.")
 
 
+#sanity test: works, mESS estimator should be working
+#iid = np.random.randn(200, 1000, 2)
+#print(mESS_single(iid), (200//2)*1000)
