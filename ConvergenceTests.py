@@ -10,11 +10,11 @@ from scipy.stats import multivariate_normal
 
 #calculate variance of each chain
 def var_per_chain(chains):
-    return np.std(chains, axis=1, ddof=1)
+    return np.std(chains, axis=0, ddof=1)
 
 #mean of parameter per chain
 def mean_per_chain(chains):    
-    return np.mean(chains, axis=1)
+    return np.mean(chains, axis=0)
 
 #calculate mean of each parameter across all chains
 def mean_all_chains(theta_bar):
@@ -44,11 +44,11 @@ def Gelman_Rubin_single(chains):
     if chains.ndim == 2:
         chains = chains[:, :, None]
 
-    m, l, dim = chains.shape
+    l, m, dim = chains.shape
     n = l // 2
 
     #discard burn in
-    chains = chains[:, -n:]
+    chains = chains[-n:, :]
 
     s=var_per_chain(chains)
     theta_bar=mean_per_chain(chains)
@@ -63,10 +63,10 @@ def Gelman_Rubin_single(chains):
 
 def Gelman_Rubin(chains):
     Rhat_all=[]
-    m, l, dim = chains.shape
+    l, m, dim = chains.shape
 
     for i in range(2,l):
-        chain = chains[:, :i].copy()
+        chain = chains[:i, :].copy()
         Rhat_all.append(Gelman_Rubin_single(chain))
 
     Rhat_all = np.array(Rhat_all)
@@ -84,7 +84,7 @@ def Gelman_Rubin(chains):
 
 #sample covariance matrix
 def cov(chains, b, a):
-    flat = chains[:, :a*b].reshape(-1, chains.shape[-1])              #chains[:, :a*b] so it's cleaner, since I also used that for sigma
+    flat = chains[:a*b, :].reshape(-1, chains.shape[-1])              #chains[:, :a*b] so it's cleaner, since I also used that for sigma
     return np.atleast_2d(np.cov(flat, rowvar=False))                  #rowvar=False st. columns are variables, rows are observations
 
 #batch estimation
@@ -96,13 +96,13 @@ def batch_size(n, t):
 
 #\bar{Y}_k:=b_n^{-1} \sum_{t=1}^{b_n} Y_{k b_n+t} .
 def batch_mean(chains, b, a, m, dim):
-    return chains[:, :a*b].reshape(m, a, b, dim).mean(axis=2)
+    return chains[:a*b, :].reshape(a*b, m, dim).mean(axis=2)
 
 #estimate of the monte carlo covariance matrix for the Markov Chain
 #\Sigma_n=\frac{b_n}{a_n-1} \sum_{k=0}^{a_n-1}\left(\bar{Y}_k-\theta_n\right)\left(\bar{Y}_k-\theta_n\right)^T .
 def MCcov(chains, b, a,m,dim):
     Ybar=batch_mean(chains,b,a,m,dim).reshape(m*a, dim)
-    mu = chains[:, :a*b].reshape(-1, dim).mean(axis=0)
+    mu = chains[:a*b, :].reshape(-1, dim).mean(axis=1)
     Rm=Ybar-mu
     return b/(m*a-1) * Rm.T@Rm
 
@@ -111,11 +111,11 @@ def mESS_single(chains):                      #here I pooled batches over differ
     if chains.ndim == 2:
         chains = chains[:, :, None]
     
-    m, l, dim = chains.shape
+    l, m, dim = chains.shape
     n = l // 2
     
     #discard burn in
-    chains = chains[:, -n:]
+    chains = chains[-n:, :]
 
     mess = []
     for t in [0.1, 0.2, 0.3, 0.4, 0.5]:
@@ -143,11 +143,11 @@ def mESS_single_t(chains):
     if chains.ndim == 2:
         chains = chains[:, :, None]
     
-    m, l, dim = chains.shape
+    l, m, dim = chains.shape
     n = l // 2
     
     #discard burn in
-    chains = chains[:, -n:]
+    chains = chains[-n:, :]
 
     mess = []
     for t in [0.1, 0.2, 0.3, 0.4, 0.5]:
@@ -170,10 +170,10 @@ def mESS_single_t(chains):
 
 def mESS(chains):
     mess_all=[]
-    m, l, dim = chains.shape
+    l, m, dim = chains.shape
 
     for i in range(2,l):
-        chain = chains[:, :i].copy()
+        chain = chains[:i, :].copy()
         mess_all.append(mESS_single(chain))
 
     mess_all = np.array(mess_all)
@@ -182,10 +182,10 @@ def mESS(chains):
 
 def mESS_t(chains):
     mess_all=[]
-    m, l, dim = chains.shape
+    l, m, dim = chains.shape
 
     for i in range(2,l):
-        chain = chains[:, :i].copy()
+        chain = chains[:i, :].copy()
         mess_all.append(mESS_single_t(chain))
 
     mess_all = np.array(mess_all)
@@ -250,7 +250,7 @@ def plot_eff(mess, l, m, log=False):
     fig.tight_layout()
     return fig, ax
 
-m, l, dim = Xns.shape
+l, m, dim = Xns.shape
 fig, ax = plot_mESS(mess,l,m)
 fig, ax = plot_eff(mess,l,m)
 plt.show()

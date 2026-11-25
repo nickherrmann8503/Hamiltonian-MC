@@ -17,7 +17,7 @@
   -> notes from the prof:
     1. KL Divergence as a "length measure" of the approximated probability distr (from the respective sampler) and the target distribution
     2. use two different seeds as a baseline in the HMC to the compare to emcee
-    3. work on marginals (?)
+    3. work on marginals - kernel estimator
     4. ESS
 - presentation:
   1. Hamiltonian MCMC 101
