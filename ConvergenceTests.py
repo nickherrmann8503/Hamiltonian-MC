@@ -207,9 +207,9 @@ Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 
 #print('chains shape: ', Xns.shape)
 
-#R_hat=Gelman_Rubin(Xns)
+R_hat=Gelman_Rubin(Xns)
 
-#print('Gelman-Rubin: ', R_hat)
+print('Gelman-Rubin: ', R_hat)
 #mess=(mESS(Xns))
 #print('multivariate effective sample size: ', mess)
 
@@ -291,6 +291,11 @@ def NUTS_divergence_diagnostic_verdict(H, T, d_t):
         print("VERDICT: chain is healthy.")
 
 
-#sanity test: works, mESS estimator should be working
+#sanity test: works -> mESS estimator should be working
 #iid = np.random.randn(200, 1000, 2)
 #print(mESS_single(iid), (200//2)*1000)
+
+moved = np.any(Xns[1:] != Xns[:-1], axis=2)   # (n_steps-1, m)
+print(1 - moved.mean())
+
+print(Xns[-1].mean(axis=0), Xns[-1].std(axis=0))
