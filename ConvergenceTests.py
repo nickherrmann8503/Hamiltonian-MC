@@ -83,8 +83,8 @@ def Gelman_Rubin(chains):
 #Carlo covariance matrix for the Markov chain (here obtained by batch estimation).
 
 #sample covariance matrix
-def cov(chains):
-    flat = chains.reshape(-1, chains.shape[-1])
+def cov(chains, b, a):
+    flat = chains[:, :a*b].reshape(-1, chains.shape[-1])              #chains[:, :a*b] so it's cleaner, since I also used that for sigma
     return np.atleast_2d(np.cov(flat, rowvar=False))                  #rowvar=False st. columns are variables, rows are observations
 
 #batch estimation
@@ -106,7 +106,7 @@ def MCcov(chains, b, a,m,dim):
     Rm=Ybar-mu
     return b/(m*a-1) * Rm.T@Rm
 
-def mESS_single(chains):                             #here I pooled batches over different chains-> if different chains have different means, this will lower mESS
+def mESS_single(chains):                      #here I pooled batches over different chains-> if different chains have different means, this will lower mESS
     #account for 1D case                      #maybe it would be better to find mESS for each chain separately and take mean of all chains    
     if chains.ndim == 2:
         chains = chains[:, :, None]
@@ -117,10 +117,37 @@ def mESS_single(chains):                             #here I pooled batches over
     #discard burn in
     chains = chains[:, -n:]
 
-    lam=cov(chains)
+    mess = []
+    for t in [0.1, 0.2, 0.3, 0.4, 0.5]:
+        b, a = batch_size(n,t)
 
-    #use slogdet to avoid over-/underflow
-    _, logdet_lam = np.linalg.slogdet(lam)
+        if m*a <= dim:          
+            continue
+
+        lam=cov(chains, b, a)
+        
+        #use slogdet to avoid over-/underflow
+        _, logdet_lam = np.linalg.slogdet(lam)
+
+        sig=MCcov(chains, b, a, m, dim)
+        _, logdet_sig = np.linalg.slogdet(sig)
+
+        mess.append(n*m*np.exp((logdet_lam-logdet_sig)/dim))
+
+    mess=np.array(mess)
+
+    return np.min(mess)
+
+def mESS_single_t(chains):                      
+    #account for 1D case                        
+    if chains.ndim == 2:
+        chains = chains[:, :, None]
+    
+    m, l, dim = chains.shape
+    n = l // 2
+    
+    #discard burn in
+    chains = chains[:, -n:]
 
     mess = []
     for t in [0.1, 0.2, 0.3, 0.4, 0.5]:
@@ -129,14 +156,17 @@ def mESS_single(chains):                             #here I pooled batches over
         if m*a <= dim:          
             continue
 
+        lam=cov(chains, b, a)
+        
+        #use slogdet to avoid over-/underflow
+        _, logdet_lam = np.linalg.slogdet(lam)
+
         sig=MCcov(chains, b, a, m, dim)
         _, logdet_sig = np.linalg.slogdet(sig)
 
-        mess.append(a*b*m*np.exp((logdet_lam-logdet_sig)/dim))
+        mess.append(n*m*np.exp((logdet_lam-logdet_sig)/dim))
 
-    mess=np.array(mess)
-
-    return np.min(mess)
+    return np.array(mess)
 
 def mESS(chains):
     mess_all=[]
@@ -150,7 +180,19 @@ def mESS(chains):
     
     return mess_all
 
-L = 10000 #leapfrog steps
+def mESS_t(chains):
+    mess_all=[]
+    m, l, dim = chains.shape
+
+    for i in range(2,l):
+        chain = chains[:, :i].copy()
+        mess_all.append(mESS_single_t(chain))
+
+    mess_all = np.array(mess_all)
+    
+    return mess_all
+
+L = 100 #leapfrog steps
 dt = 0.5 #step size
 M = np.array([[10000.0,0],
               [0,10000.0]])
@@ -160,7 +202,7 @@ p_start = np.random.normal(0,1)
 p_start = np.random.default_rng().multivariate_normal([0,0], M, size=1)
 
 #now computes alll chains at once
-X0s = [[random()*100,random()*100] for i in range(10)]
+X0s = [[random()*100,random()*100] for i in range(1000)]
 Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 
 #print('chains shape: ', Xns.shape)
@@ -169,7 +211,7 @@ Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 
 #print('Gelman-Rubin: ', R_hat)
 mess=(mESS(Xns))
-print('multivariate effective sample size: ', mess)
+#print('multivariate effective sample size: ', mess)
 
 #plot mESS
 def plot_mESS(mess, l, m, log=False):
@@ -212,6 +254,14 @@ m, l, dim = Xns.shape
 fig, ax = plot_mESS(mess,l,m)
 fig, ax = plot_eff(mess,l,m)
 plt.show()
+
+# issue: sawtooth structure in efficiency plot -> plot efficiency for different t's/batch sizes separately
+# result: probably some bias in logdet estimate of sigma, because estimates rise for larger t
+mess_t = mESS_t(Xns)
+for i,t in zip(range(5),[0.1,0.2,0.3,0.4,0.5]):
+    fig, ax = plot_eff(mess_t[:,i],l,m)
+    ax.set_title('$t={t}$')
+    plt.show()
 
 def NUTS_divergence_diagnostic(H, T, d_t):
     """
