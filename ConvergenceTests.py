@@ -23,16 +23,16 @@ def mean_all_chains(theta_bar):
 #3. Calculate the within and between chain variance.
 
 #within chain variance:
-def within_var(M,s):
-    return 1/M * np.sum(s**2, axis=0)
+def within_var(m,s):
+    return 1/m * np.sum(s**2, axis=0)
 
 #between chain variance:
-def between_var(N,M,theta_bar,mu):
-    return N/(M-1)* np.sum((theta_bar-mu)**2, axis=0)
+def between_var(n,m,theta_bar,mu):
+    return n/(m-1)* np.sum((theta_bar-mu)**2, axis=0)
 
 #4. Calculate the estimated variance of \theta as the weighted sum of between and within chain variance.
-def variance(N,W,B):
-    return (1-1/N)*W + 1/N*B
+def variance(n,W,B):
+    return (1-1/n)*W + 1/n*B
 
 #5. Calculate the potential scale reduction factor.
 def scale_red_factor(var,W):
@@ -44,28 +44,28 @@ def Gelman_Rubin_single(chains):
     if chains.ndim == 2:
         chains = chains[:, :, None]
 
-    M, L, D = chains.shape
-    N = L // 2
+    m, l, dim = chains.shape
+    n = l // 2
 
     #discard burn in
-    chains = chains[:, -N:]
+    chains = chains[:, -n:]
 
     s=var_per_chain(chains)
     theta_bar=mean_per_chain(chains)
     mu=mean_all_chains(theta_bar)
 
-    W = within_var(M,s)
-    B = between_var(N,M,theta_bar,mu)
-    var = variance(N,W,B)
-    R_hat = scale_red_factor(var,W)
+    wit = within_var(m,s)
+    bet = between_var(n,m,theta_bar,mu)
+    var = variance(n,wit,bet)
+    R_hat = scale_red_factor(var,wit)
 
     return R_hat
 
 def Gelman_Rubin(chains):
     Rhat_all=[]
-    M, L, D = chains.shape
+    m, l, dim = chains.shape
 
-    for i in range(2,L):
+    for i in range(2,l):
         chain = chains[:, :i].copy()
         Rhat_all.append(Gelman_Rubin_single(chain))
 
@@ -87,39 +87,35 @@ def cov(chains):
     flat = chains.reshape(-1, chains.shape[-1])
     return np.atleast_2d(np.cov(flat, rowvar=False))                  #rowvar=False st. columns are variables, rows are observations
 
-#identity if looking for mean, change this if looking for probability,etc.
-def g(x):
-    return x
-
 #batch estimation
 #rule of thumb: batch size of sqrt(N)
 #let T={.1, .2, .3, .4, .5}, and take mESS^*=\min _{t \in T, b_n=n^t} mESS(b_n)
-def batch_size(N, t):
-    b = max(1, int(N**t))
-    return b, N//b
+def batch_size(n, t):
+    b = max(1, int(n**t))
+    return b, n//b
 
 #\bar{Y}_k:=b_n^{-1} \sum_{t=1}^{b_n} Y_{k b_n+t} .
-def batch_mean(chains, b, a, M, D):
-    return chains[:, :a*b].reshape(M, a, b, D).mean(axis=2)
+def batch_mean(chains, b, a, m, dim):
+    return chains[:, :a*b].reshape(m, a, b, dim).mean(axis=2)
 
 #estimate of the monte carlo covariance matrix for the Markov Chain
 #\Sigma_n=\frac{b_n}{a_n-1} \sum_{k=0}^{a_n-1}\left(\bar{Y}_k-\theta_n\right)\left(\bar{Y}_k-\theta_n\right)^T .
-def MCcov(chains, b, a,M,D):
-    Ybar=batch_mean(chains,b,a,M,D).reshape(M*a, D)
-    mu = chains[:, :a*b].reshape(-1, D).mean(axis=0)
-    R=Ybar-mu
-    return b/(M*a-1) * R.T@R
+def MCcov(chains, b, a,m,dim):
+    Ybar=batch_mean(chains,b,a,m,dim).reshape(m*a, dim)
+    mu = chains[:, :a*b].reshape(-1, dim).mean(axis=0)
+    Rm=Ybar-mu
+    return b/(m*a-1) * Rm.T@Rm
 
 def mESS_single(chains):                             #here I pooled batches over different chains-> if different chains have different means, this will lower mESS
     #account for 1D case                      #maybe it would be better to find mESS for each chain separately and take mean of all chains    
     if chains.ndim == 2:
         chains = chains[:, :, None]
     
-    M, L, D = chains.shape
-    N = L // 2
+    m, l, dim = chains.shape
+    n = l // 2
     
     #discard burn in
-    chains = chains[:, -N:]
+    chains = chains[:, -n:]
 
     lam=cov(chains)
 
@@ -128,15 +124,15 @@ def mESS_single(chains):                             #here I pooled batches over
 
     mess = []
     for t in [0.1, 0.2, 0.3, 0.4, 0.5]:
-        b, a = batch_size(N,t)
+        b, a = batch_size(n,t)
 
-        if M*a <= D:          
+        if m*a <= dim:          
             continue
 
-        sig=MCcov(chains, b, a, M, D)
+        sig=MCcov(chains, b, a, m, dim)
         _, logdet_sig = np.linalg.slogdet(sig)
 
-        mess.append(a*b*M*np.exp((logdet_lam-logdet_sig)/D))
+        mess.append(a*b*m*np.exp((logdet_lam-logdet_sig)/dim))
 
     mess=np.array(mess)
 
@@ -144,9 +140,9 @@ def mESS_single(chains):                             #here I pooled batches over
 
 def mESS(chains):
     mess_all=[]
-    M, L, D = chains.shape
+    m, l, dim = chains.shape
 
-    for i in range(2,L):
+    for i in range(2,l):
         chain = chains[:, :i].copy()
         mess_all.append(mESS_single(chain))
 
@@ -154,7 +150,7 @@ def mESS(chains):
     
     return mess_all
 
-L = 1000 #leapfrog steps
+L = 10000 #leapfrog steps
 dt = 0.5 #step size
 M = np.array([[10000.0,0],
               [0,10000.0]])
@@ -169,35 +165,20 @@ Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 
 #print('chains shape: ', Xns.shape)
 
-#1D
-"""chains = []
-for i in range(100):
-    x_start = random()*100
-    Xn = chain(x_start,30,dt,L,1)
-    chains.append(Xn)
-    plt.plot(Xn)
-plt.show()
-chains = np.array(chains)
-mean = np.sum(chains[:,-1])/100
-std = np.std(chains[:,-1])
-#print(chains[:,-1])
-#print(mean,std)
-"""
-
 #R_hat=Gelman_Rubin(Xns)
 
 #print('Gelman-Rubin: ', R_hat)
 mess=(mESS(Xns))
 print('multivariate effective sample size: ', mess)
 
-#plot mESS/Efficiency
-def plot_mESS(mess, log=False):
-    x = np.arange(1, len(mess) + 1)
+#plot mESS
+def plot_mESS(mess, l, m, log=False):
+    lengths = np.arange(2, l)
 
     fig, ax = plt.subplots(figsize=(6, 4))
 
-    ax.plot(x, mess, "o-", lw=2, ms=4, label="mESS")
-    ax.plot(x, x, "k--", lw=0.8, alpha=0.5, label="mESS = n")  # i.i.d. upper bound
+    ax.plot(lengths, mess, "o-", lw=2, ms=4, label="mESS")
+    ax.plot(lengths, m*(lengths//2), "k--", lw=0.8, alpha=0.5, label="mESS = n")  # i.i.d. upper bound
     if log:
         ax.set_xscale("log")
         ax.set_yscale("log")
@@ -208,8 +189,28 @@ def plot_mESS(mess, log=False):
     fig.tight_layout()
     return fig, ax
 
-# usage
-fig, ax = plot_mESS(mess)
+#plot Efficiency
+def plot_eff(mess, l, m, log=False):
+    lengths = np.arange(2, l)
+    ones=np.ones(l-2)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    ax.plot(lengths, mess/(m*(lengths//2)), "o-", lw=2, ms=4, label="mESS/n")
+    ax.plot(lengths, ones, "k--", lw=0.8, alpha=0.5, label="mESS = n")  # i.i.d. upper bound
+    if log:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+    ax.set_xlabel("chain length")
+    ax.set_ylabel("mESS/n")
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    return fig, ax
+
+m, l, dim = Xns.shape
+fig, ax = plot_mESS(mess,l,m)
+fig, ax = plot_eff(mess,l,m)
 plt.show()
 
 def NUTS_divergence_diagnostic(H, T, d_t):
