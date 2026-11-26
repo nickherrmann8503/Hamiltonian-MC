@@ -73,6 +73,18 @@ def Gelman_Rubin(chains):
     
     return Rhat_all
 
+def split_Gelman_Rubin(chains):
+    l, m, dim = chains.shape
+    x=m//2
+
+    chain_1=chains[:,:x].copy()
+    chain_2=chains[:,-x:].copy()
+
+    Rhat=[]
+    Rhat.append(Gelman_Rubin(chain_1))
+    Rhat.append(Gelman_Rubin(chain_2))
+
+    return np.array(Rhat)
 
 #multivariate Effective sample size (mESS)
 
@@ -207,7 +219,7 @@ Xns = np.array(dchain(np.array(X0s),100,dt,L,M))
 
 #print('chains shape: ', Xns.shape)
 
-R_hat=Gelman_Rubin(Xns)
+R_hat=split_Gelman_Rubin(Xns)
 
 print('Gelman-Rubin: ', R_hat)
 #mess=(mESS(Xns))
@@ -295,7 +307,7 @@ def NUTS_divergence_diagnostic_verdict(H, T, d_t):
 #iid = np.random.randn(200, 1000, 2)
 #print(mESS_single(iid), (200//2)*1000)
 
-moved = np.any(Xns[1:] != Xns[:-1], axis=2)   # (n_steps-1, m)
-print(1 - moved.mean())
+#moved = np.any(Xns[1:] != Xns[:-1], axis=2)   # (n_steps-1, m)
+#print(1 - moved.mean())
 
-print(Xns[-1].mean(axis=0), Xns[-1].std(axis=0))
+#print(Xns[-1].mean(axis=0), Xns[-1].std(axis=0))
