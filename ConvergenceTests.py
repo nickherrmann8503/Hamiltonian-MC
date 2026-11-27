@@ -1,9 +1,8 @@
 import numpy as np
-from numpy import linalg
 from HamiltonianSampler import dchain, chain
-from random import randint,random
+from random import random
 import matplotlib.pyplot as plt
-from scipy.stats import multivariate_normal
+from scipy.stats import rankdata, norm
 
 #first implement for 1D
 ### Gelman-Rubin: aim for Rhat<1.1 or (for rank-normalized split Rhat) Rhat<1.01
@@ -38,6 +37,12 @@ def variance(n,W,B):
 def scale_red_factor(var,W):
     return np.sqrt(var/W)
 
+def rank_normalized_val(m,n,dim,chains):
+    s=m*n
+    flat = chains.reshape(s,dim)
+    r = rankdata(flat, method="average", axis=0).reshape(n,m,dim)
+    return norm.ppf((r - 3/8) / (s + 1/4))
+
 def Gelman_Rubin_single(chains):
 
     #account for 1D case
@@ -49,6 +54,9 @@ def Gelman_Rubin_single(chains):
 
     #discard burn in
     chains = chains[-n:, :]
+
+    #rank-normalized values
+    chains=rank_normalized_val(m,n,dim,chains)
 
     s=var_per_chain(chains)
     theta_bar=mean_per_chain(chains)
