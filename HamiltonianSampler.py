@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal
 from functools import partial
+from time import time
 
 from benchmark_distr import sample_funnel, log_neal_funnel
 
@@ -22,7 +23,10 @@ def gaussian(t,mu,sigma):
     return np.exp(-(t-mu)**2/(2*sigma**2))/(sigma*np.sqrt(2*np.pi))
 
 def gaussian_ND(x,mu,M):
-    d = x.shape[1]
+    if len(x.shape) == 1:
+        d= len(x)
+    else:
+        d = x.shape[1]
     x= np.atleast_2d(x)
     #print("det", np.linalg.det(M),x-mu,x,mu)
     #print("inv", np.linalg.inv(M))
@@ -154,8 +158,95 @@ def dchain(x_0,N,dt,L,mass_matrix,method = "gaussian"):
 
     return X
 
-#EFFICIENT NO U TURN SAMPLER from paper
 
+logp_ = lambda x: np.log(gaussian_ND(x,means,Sigma))
+def FindReasonableEpsilon(theta,logp):
+    epsilon = 1.0
+    p = lambda x: np.exp(logp(x))
+    r = np.random.default_rng().multivariate_normal(np.zeros_like(theta[0]), np.eye(len(theta[0])))
+    print(r)
+    theta_,r_ = leapfrog_d(theta,r,epsilon,1,np.eye(len(theta[0])),logp)
+    poverp = (p(theta_)-0.5*r_ @ r_.T)-(p(theta)-0.5*r @ r.T)
+    a = -1 if poverp>0.5 else 2-1
+
+    while poverp**a > 2**(-a):
+        epsilon  = 2**a*epsilon
+        theta_,r_ = leapfrog_d(theta,r,epsilon,1,np.eye(len(theta[0])),logp)
+        poverp = (p(theta_)-0.5*r_ @ r_.T)-(p(theta)-0.5*r @ r.T)
+    return epsilon
+
+print("this is:",FindReasonableEpsilon(np.array([[90.0,50.0]]),logp_))
+#NO U TURN SAMPLER WITH DUAL AVERAGING
+def NUTS_dual(theta_0,delta,L,M,M_adapt,logp):
+    eps_0 = FindReasonableEpsilon(theta_0,logp)
+    mu = np.log(10*eps_0)
+    eps_0_bar = 1.0
+    H_0_bar = 0.0
+    gamma,t0,kappa = 0.05,10,0.75
+    #shape(nchains,M,d)
+    theta = np.zeros((len(theta_0),M,len(theta_0[0])))
+    theta[:,0,:] = theta_0[:,:]
+    for m in range(1,M+1):
+        r = np.random.default_rng().multivariate_normal(np.zeros_like(theta_0[0]), np.eye(len(theta_0[0])))
+        theta[:,m,:],theta_ = theta[:,m-1,:],theta[:,m-1,:]
+        r_tilde = r
+        L_m = max(1,np.round())
+
+#NAIVE NO U TURN SAMPLER
+def BuildTree(theta,r,u,v,j,epsilon,L,mass_matrix):
+    if j == 0:
+        theta_,r_ = leapfrog_d(theta,r, v * epsilon,1,mass_matrix,L)
+        theta_,r_ = theta_[0],r_[0]
+        C_ = []
+        if np.exp(L(theta_)-0.5*r_.T @r_) >= u:
+            C_ = [[theta_,r_]]
+        s_ = 0
+        DELTAMAX = 1000
+        if u < np.exp(DELTAMAX+L(theta_)-0.5*r_.T @r_):
+            s_ = 1
+        return theta_,r_,theta_,r_,C_,s_
+    else:
+        thetaminus,rminus,thetaplus,rplus,C_,s_ = BuildTree(theta,r,u,v,j-1,epsilon,L,mass_matrix)
+        if v == -1:
+            thetaminus,rminus,_,_,C__,s__ = BuildTree(thetaminus,rminus,u,v,j-1,epsilon,L,mass_matrix)
+        else:
+            _,_,thetaplus,rplus,C__,s__ = BuildTree(thetaplus,rplus,u,v,j-1,epsilon,L,mass_matrix)
+         
+        dtheta = thetaplus-thetaminus
+        s_ = s_ * s__ * (dtheta @ rminus >= 0) * (dtheta @ rplus >= 0)
+        C_.extend(C__)
+        return thetaminus,rminus,thetaplus,rplus,C_,s_
+
+def NAIVE_NUTS(theta_0,epsilon,L,M,mass_matrix):
+    theta = np.zeros((len(theta_0),M,len(theta_0[0])))
+    theta[:,0,:] = theta_0[:,:]
+    for c in range(len(theta_0)):
+        for m in range(1,M):
+            r0 = np.random.default_rng().multivariate_normal(np.zeros_like(theta_0[0]), np.eye(len(theta_0[0])))
+            u = np.random.default_rng().uniform(0,np.exp(L(theta[c,m-1,:])-0.5*np.dot(r0,r0)))
+            thetaminus = theta[c,m-1,:]
+            thetaplus = theta[c,m-1,:]
+            rminus = r0
+            rplus = r0
+            j=0
+            C = [[theta[c,m-1,:],r0]]
+            s=1
+            while s==1:
+                vj = np.random.default_rng().choice([-1,1])
+                if vj==-1:
+                    thetaminus,rminus,_,_,C_,s_ = BuildTree(thetaminus,rminus,u,vj,j,epsilon,L,mass_matrix)
+                else:
+                    _,_,thetaplus,rplus,C_,s_ = BuildTree(thetaplus,rplus,u,vj,j,epsilon,L,mass_matrix)
+                if s_ ==1:
+                    C.extend(C_)
+                dtheta = thetaplus-thetaminus
+                s = s_ * (dtheta @ rminus >= 0) * (dtheta @ rplus >= 0)
+                j += 1
+            theta[c,m,:],r = np.random.default_rng().choice(C)
+    return theta
+
+
+        
 
 d = 2
 #GAUSSIAN
@@ -245,7 +336,6 @@ plt.show()"""
 plt.plot(ts, target_distribution(ts))
 plt.legend()
 plt.show()"""
-
 
 
 
