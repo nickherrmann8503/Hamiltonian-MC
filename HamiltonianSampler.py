@@ -35,6 +35,20 @@ def gaussian_ND(x,mu,M):
     norm = np.sqrt((2*np.pi)**d * np.linalg.det(M))
     return np.exp(-0.5 * quad) / norm
 
+def gaussian_ND_multimode(x, mu1, mu2, M):
+    d = x.shape[1]
+    x = np.atleast_2d(x)
+    #print("det", np.linalg.det(M),x-mu,x,mu)
+    #print("inv", np.linalg.inv(M))
+    diff1 = x-mu1
+    diff2 = x-mu2
+    Minv = np.linalg.inv(M)
+    quad1 = np.einsum('ij,jk,ik->i', diff1, Minv, diff1)
+    norm = np.sqrt((2*np.pi)**d * np.linalg.det(M))  
+    quad2 = np.einsum('ij,jk,ik->i', diff2, Minv, diff2)
+
+    return np.exp(-0.5 * quad1) / norm + np.exp(-0.5 * quad2) / norm
+
 
 #CHANGE THIS TO CHOOSE THE DISTRIBUTION TO SAMPLE
 #neal's funnel
@@ -139,6 +153,9 @@ def dchain(x_0,N,dt,L,mass_matrix,method = "gaussian"):
         print("Neal's funnel sampling")
         logp = log_neal_funnel
         is_log = True
+    elif method == "gaussian multimodal":
+            print("multimodal gaussian sampling")
+            logp = lambda x: np.log(gaussian_ND_multimode(x, mu1=means[0, :], mu2=means[1, :], M=Sigma))
     else:
         print("invalid method")
         return "err"
